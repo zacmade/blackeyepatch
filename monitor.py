@@ -1,35 +1,29 @@
 import json
 import os
-import requests
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 import smtplib
 from email.message import EmailMessage
 
 # =====================================
 # CONFIG
 # =====================================
-
-BASE_URLS = [
-    "https://blackeyepatch.com/collections/sweat.json",
-    "https://blackeyepatch.com/collections/tops.json"
+URLS = [
+    "https://blackeyepatch.com/collections/sweat",
+    "https://blackeyepatch.com/collections/tops"
 ]
-
-KEYWORDS = [
-    "jumper",
-    "tshirt",
-    "tee",
-]
-
+KEYWORDS = ["jumper", "tshirt", "tee","hoodie","sweat"]
 SEEN_FILE = "seen.json"
-
-# EMAIL SETTINGS
-EMAIL_ADDRESS = os.environ["EMAIL_ADDRESS"]
-EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]
-SEND_TO = os.environ["SEND_TO"]
+EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+SEND_TO = os.environ.get("SEND_TO")
+CHECK_INTERVAL = 60  # seconds
 
 # =====================================
 # LOAD SEEN PRODUCTS
 # =====================================
-
 if os.path.exists(SEEN_FILE):
     with open(SEEN_FILE, "r") as f:
         seen = set(json.load(f))
@@ -37,50 +31,57 @@ else:
     seen = set()
 
 # =====================================
+# SETUP SELENIUM
+# =====================================
+chrome_options = Options()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+driver = webdriver.Chrome(options=chrome_options)
+
+# =====================================
 # FETCH PRODUCTS
 # =====================================
-
 new_products = []
 
-for base_url in BASE_URLS:
+for base_url in URLS:
     page = 1
     while True:
         url = f"{base_url}?page={page}"
-        response = requests.get(url, timeout=20)
-        data = response.json()
-        products = data.get("products", [])
-        if not products:
+        driver.get(url)
+        time.sleep(3)  # wait for page to load
+
+        product_elements = driver.find_elements(By.CSS_SELECTOR, 'a.full-unstyled-link')
+        if not product_elements:
             break
 
-        for product in products:
-            title = product["title"]
-            handle = product["handle"]
+        found_any = False
+        for elem in product_elements:
+            title = elem.text.strip()
+            link = elem.get_attribute('href')
 
             lower = title.lower()
-
             if any(keyword in lower for keyword in KEYWORDS):
+                found_any = True
                 if title not in seen:
-                    link = f"https://blackeyepatch.com/products/{handle}"
                     new_products.append((title, link))
                     seen.add(title)
+        if not found_any:
+            break
         page += 1
 
 # =====================================
 # SEND EMAIL ALERTS
 # =====================================
-
 if new_products:
     msg = EmailMessage()
-
     msg["Subject"] = "BlackEyePatch New Drop Alert"
     msg["From"] = EMAIL_ADDRESS
     msg["To"] = SEND_TO
 
     body = "New BlackEyePatch items detected:\n\n"
-
     for title, link in new_products:
-        display_title = title.title()
-        body += f"{display_title}\n{link}\n\n"
+        body += f"{title.title()}\n{link}\n\n"
 
     msg.set_content(body)
 
@@ -93,6 +94,10 @@ if new_products:
 # =====================================
 # SAVE UPDATED PRODUCTS
 # =====================================
-
 with open(SEEN_FILE, "w") as f:
     json.dump(list(seen), f)
+
+# =====================================
+# CLEANUP
+# =====================================
+driver.quit()

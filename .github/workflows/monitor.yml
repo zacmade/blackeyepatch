@@ -24,6 +24,7 @@ jobs:
 
       - name: Run monitor
         env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           SEND_TO: ${{ secrets.SEND_TO }}

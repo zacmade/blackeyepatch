@@ -8,13 +8,15 @@ from email.message import EmailMessage
 # CONFIG
 # =====================================
 
-PRODUCTS_URL = "https://blackeyepatch.com/products.json?limit=250"
+BASE_URLS = [
+    "https://blackeyepatch.com/collections/sweat.json",
+    "https://blackeyepatch.com/collections/tops.json"
+]
 
 KEYWORDS = [
-    "hoodie",
     "jumper",
-    "crewneck",
-    "sweatshirt",
+    "tshirt",
+    "tee",
 ]
 
 SEEN_FILE = "seen.json"
@@ -38,22 +40,30 @@ else:
 # FETCH PRODUCTS
 # =====================================
 
-response = requests.get(PRODUCTS_URL, timeout=20)
-products = response.json()["products"]
-
 new_products = []
 
-for product in products:
-    title = product["title"]
-    handle = product["handle"]
+for base_url in BASE_URLS:
+    page = 1
+    while True:
+        url = f"{base_url}?page={page}"
+        response = requests.get(url, timeout=20)
+        data = response.json()
+        products = data.get("products", [])
+        if not products:
+            break
 
-    lower = title.lower()
+        for product in products:
+            title = product["title"]
+            handle = product["handle"]
 
-    if any(keyword in lower for keyword in KEYWORDS):
-        if title not in seen:
-            link = f"https://blackeyepatch.com/products/{handle}"
-            new_products.append((title, link))
-            seen.add(title)
+            lower = title.lower()
+
+            if any(keyword in lower for keyword in KEYWORDS):
+                if title not in seen:
+                    link = f"https://blackeyepatch.com/products/{handle}"
+                    new_products.append((title, link))
+                    seen.add(title)
+        page += 1
 
 # =====================================
 # SEND EMAIL ALERTS
@@ -66,15 +76,11 @@ if new_products:
     msg["From"] = EMAIL_ADDRESS
     msg["To"] = SEND_TO
 
-    body = "New BlackEyePatch items detected:
-
-"
+    body = "New BlackEyePatch items detected:\n\n"
 
     for title, link in new_products:
-        body += f"{title}
-{link}
-
-"
+        display_title = title.title()
+        body += f"{display_title}\n{link}\n\n"
 
     msg.set_content(body)
 

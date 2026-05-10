@@ -16,7 +16,7 @@ URLS = [
     "https://blackeyepatch.com/collections/sweat",
     "https://blackeyepatch.com/collections/tops"
 ]
-KEYWORDS = ["jumper", "tshirt", "tee"]
+KEYWORDS = ["jumper", "tshirt", "tee","hoodie","sweat"]
 SEEN_FILE = "seen.json"
 EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")

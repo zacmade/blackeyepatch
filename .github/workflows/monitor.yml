@@ -11,19 +11,13 @@ env:
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5      # updated for Node.js 24
-
-      - name: Set up Python
-        uses: actions/setup-python@v6  # updated for Node.js 24
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-
       - name: Install dependencies
-        run: pip install requests
-
+        run: pip install selenium webdriver-manager
       - name: Run monitor
         env:
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}

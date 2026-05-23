@@ -1,6 +1,7 @@
 """
 Black Eyepatch New Outfit Monitor
 ==================================
+Monitors only the Sweatshirt and Tees collections.
 Designed for GitHub Actions — runs once per trigger, no loop.
 known_products.json is committed back to the repo by the workflow
 so it persists between runs.
@@ -22,13 +23,14 @@ CONFIG = {
     "GMAIL_ADDRESS":      os.environ["GMAIL_ADDRESS"],
     "GMAIL_APP_PASSWORD": os.environ["GMAIL_APP_PASSWORD"],
     "NOTIFY_EMAIL":       os.environ["NOTIFY_EMAIL"],
-    # Filter: only alert on products whose title/type/tags contain these words.
-    # Set to [] to be alerted on ALL new products.
-    "KEYWORDS": ["jacket", "hoodie", "tee", "shirt", "pants", "shorts",
-                 "cap", "hat", "outfit", "apparel", "coat", "sweater"],
 }
 
-PRODUCTS_URL        = "https://blackeyepatch.com/collections/all/products.json?limit=250"
+# Only these two collections are monitored
+COLLECTION_URLS = [
+    "https://blackeyepatch.com/en/collections/sweat/products.json?limit=250",
+    "https://blackeyepatch.com/en/collections/tees/products.json?limit=250",
+]
+
 KNOWN_PRODUCTS_FILE = "known_products.json"
 
 logging.basicConfig(
@@ -40,19 +42,25 @@ log = logging.getLogger(__name__)
 
 
 def fetch_products() -> list[dict]:
+    """Fetch all products from both monitored collections, deduplicated."""
+    seen_ids = set()
     all_products = []
-    page = 1
-    while True:
-        url  = f"{PRODUCTS_URL}&page={page}"
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        data = resp.json().get("products", [])
-        if not data:
-            break
-        all_products.extend(data)
-        if len(data) < 250:
-            break
-        page += 1
+    for base_url in COLLECTION_URLS:
+        page = 1
+        while True:
+            url  = f"{base_url}&page={page}"
+            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            data = resp.json().get("products", [])
+            if not data:
+                break
+            for p in data:
+                if str(p["id"]) not in seen_ids:
+                    seen_ids.add(str(p["id"]))
+                    all_products.append(p)
+            if len(data) < 250:
+                break
+            page += 1
     return all_products
 
 
@@ -68,16 +76,6 @@ def save_known_ids(ids: set[str]) -> None:
         json.dump(sorted(ids), f, indent=2)
 
 
-def matches_keywords(product: dict) -> bool:
-    keywords = CONFIG["KEYWORDS"]
-    if not keywords:
-        return True
-    title = (product.get("title") or "").lower()
-    ptype = (product.get("product_type") or "").lower()
-    tags  = " ".join(product.get("tags") or []).lower()
-    return any(kw.lower() in f"{title} {ptype} {tags}" for kw in keywords)
-
-
 def send_email(new_products: list[dict]) -> None:
     subject = f"🆕 Black Eyepatch: {len(new_products)} New Item{'s' if len(new_products) > 1 else ''} Dropped!"
 
@@ -85,7 +83,7 @@ def send_email(new_products: list[dict]) -> None:
     for p in new_products:
         handle   = p.get("handle", "")
         title    = p.get("title", "Unknown")
-        url      = f"https://blackeyepatch.com/products/{handle}"
+        url      = f"https://blackeyepatch.com/en/products/{handle}"
         images   = p.get("images") or []
         img_src  = images[0].get("src", "") if images else ""
         img_tag  = f'<img src="{img_src}" width="200" style="border-radius:8px;margin-bottom:8px;" /><br/>' if img_src else ""
@@ -103,11 +101,12 @@ def send_email(new_products: list[dict]) -> None:
     html = f"""
     <html><body style="font-family:sans-serif;max-width:600px;margin:auto;">
         <h2 style="border-bottom:2px solid #111;padding-bottom:8px;">Black Eyepatch Drop Alert 🏴</h2>
-        <p>New item(s) just appeared on the site:</p>
+        <p>New item(s) just appeared in Sweatshirts or Tees:</p>
         {items_html}
         <p style="color:#aaa;font-size:12px;margin-top:30px;">
             Detected at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ·
-            <a href="https://blackeyepatch.com/collections/all">Browse all</a>
+            <a href="https://blackeyepatch.com/en/collections/sweat">Sweatshirts</a> ·
+            <a href="https://blackeyepatch.com/en/collections/tees">Tees</a>
         </p>
     </body></html>
     """
@@ -126,7 +125,7 @@ def send_email(new_products: list[dict]) -> None:
 
 
 def check_once() -> None:
-    log.info("Checking Black Eyepatch for new products...")
+    log.info("Checking Black Eyepatch sweatshirts + tees...")
     products    = fetch_products()
     known_ids   = load_known_ids()
     current_ids = {str(p["id"]) for p in products}
@@ -142,12 +141,9 @@ def check_once() -> None:
         save_known_ids(current_ids)
         return
 
-    new_products = [p for p in products if str(p["id"]) in new_ids and matches_keywords(p)]
-    log.info(f"Found {len(new_ids)} new product(s), {len(new_products)} match keyword filter.")
-
-    if new_products:
-        send_email(new_products)
-
+    new_products = [p for p in products if str(p["id"]) in new_ids]
+    log.info(f"Found {len(new_products)} new product(s) — sending email.")
+    send_email(new_products)
     save_known_ids(current_ids)
 
 

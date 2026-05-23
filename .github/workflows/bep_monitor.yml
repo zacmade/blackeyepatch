@@ -2,7 +2,7 @@ name: Black Eyepatch Monitor
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Every 30 minutes
+    - cron: '*/1 * * * *'  # Every 30 minutes
   workflow_dispatch:         # Allows manual trigger from the Actions tab
 
 # Needed so the action can commit known_products.json back to the repo

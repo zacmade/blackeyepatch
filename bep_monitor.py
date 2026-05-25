@@ -11,6 +11,7 @@ import requests
 import json
 import smtplib
 import os
+import time
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -41,15 +42,36 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def make_session() -> requests.Session:
+    """Create a session that looks like a real browser."""
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://blackeyepatch.com/",
+        "Connection": "keep-alive",
+    })
+    # Visit the collection page first so we look like a real browser
+    try:
+        session.get("https://blackeyepatch.com/en/collections/tees", timeout=15)
+        time.sleep(2)
+    except Exception:
+        pass
+    return session
+
+
 def fetch_products() -> list[dict]:
     """Fetch all products from both monitored collections, deduplicated."""
+    session  = make_session()
     seen_ids = set()
     all_products = []
     for base_url in COLLECTION_URLS:
         page = 1
         while True:
             url  = f"{base_url}&page={page}"
-            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            resp = session.get(url, timeout=15)
             resp.raise_for_status()
             data = resp.json().get("products", [])
             if not data:
@@ -61,6 +83,7 @@ def fetch_products() -> list[dict]:
             if len(data) < 250:
                 break
             page += 1
+        time.sleep(1)  # small delay between collections
     return all_products
 
 

@@ -1,11 +1,8 @@
 """
 Black Eyepatch New Outfit Monitor
-==================================
-Monitors only the Sweatshirt and Tees collections.
-Uses HTML scraping instead of the JSON API to avoid Cloudflare blocks.
-Designed for GitHub Actions — runs once per trigger, no loop.
-known_products.json is committed back to the repo by the workflow
-so it persists between runs.
+Monitors Sweatshirt and Tees collections.
+Designed for GitHub Actions — runs once per trigger.
+known_products.json is committed back to repo to persist between runs.
 """
 
 import requests
@@ -19,9 +16,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# ──────────────────────────────────────────────
-#  CONFIGURATION — set these as GitHub Secrets
-# ──────────────────────────────────────────────
 CONFIG = {
     "GMAIL_ADDRESS":      os.environ["GMAIL_ADDRESS"],
     "GMAIL_APP_PASSWORD": os.environ["GMAIL_APP_PASSWORD"],
@@ -29,14 +23,8 @@ CONFIG = {
 }
 
 COLLECTIONS = [
-    {
-        "name": "Sweatshirts",
-        "url":  "https://blackeyepatch.com/en/collections/sweat",
-    },
-    {
-        "name": "Tees",
-        "url":  "https://blackeyepatch.com/en/collections/tees",
-    },
+    {"name": "Sweatshirts", "url": "https://blackeyepatch.com/en/collections/sweat"},
+    {"name": "Tees",        "url": "https://blackeyepatch.com/en/collections/tees"},
 ]
 
 KNOWN_PRODUCTS_FILE = "known_products.json"
@@ -49,64 +37,35 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def make_session() -> requests.Session:
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    })
-    return session
-
-
 def fetch_products() -> list[dict]:
-    """Scrape product handles and IDs from collection pages."""
-    session = make_session()
+    """Scrape product handles from collection pages."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     all_products = []
     seen_handles = set()
 
     for collection in COLLECTIONS:
-        page = 1
-        while True:
-            url  = f"{collection['url']}?page={page}"
-            resp = session.get(url, timeout=15)
-            html = resp.text
+        url  = f"{collection['url']}?page=1"
+        resp = requests.get(url, headers=headers, timeout=15)
+        html = resp.text
+        log.info(f"Fetched {url} — status {resp.status_code}, size {len(html)} bytes")
 
-            # Log status so we can debug if needed
-            log.info(f"Fetched {url} — status {resp.status_code}, size {len(html)} bytes")
+        handles = re.findall(r'href="(/en/products/([^"?#/]+))"', html)
+        log.info(f"Found {len(handles)} raw handle matches for {collection['name']}")
 
-            if resp.status_code != 200:
-                log.warning(f"Non-200 response for {url}")
-                break
-
-            # Extract product handles from href links like /en/products/some-handle
-            # Use /en/products/ links only (not /en/collections/.../products/) to avoid duplicates
-            handles = re.findall(r'href="(/en/products/([^"?#/]+))"', html)
-            if not handles:
-                break
-
-            new_on_page = 0
-            for full_path, handle in handles:
-                if handle not in seen_handles:
-                    seen_handles.add(handle)
-                    all_products.append({
-                        "id":     handle,   # use handle as the stable ID
-                        "handle": handle,
-                        "title":  handle.replace("-", " ").title(),
-                        "url":    f"https://blackeyepatch.com{full_path}",
-                        "collection": collection["name"],
-                    })
-                    new_on_page += 1
-
-            if new_on_page == 0:
-                break  # no new products on this page, stop paginating
-
-            page += 1
-            time.sleep(1)
-
+        for full_path, handle in handles:
+            if handle not in seen_handles:
+                seen_handles.add(handle)
+                all_products.append({
+                    "id":         handle,
+                    "handle":     handle,
+                    "title":      handle.replace("-", " ").title(),
+                    "url":        f"https://blackeyepatch.com{full_path}",
+                    "collection": collection["name"],
+                })
         time.sleep(2)
 
     log.info(f"Found {len(all_products)} total products across collections.")

@@ -34,7 +34,12 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           NOTIFY_EMAIL:       ${{ secrets.NOTIFY_EMAIL }}
         run: python bep_monitor.py
-
+      - name: Debug HTML
+        env:
+          GMAIL_ADDRESS:      ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAIL:       ${{ secrets.NOTIFY_EMAIL }}
+        run: python bep_debug.py
       - name: Commit updated known_products.json
         run: |
           git config user.name  "github-actions[bot]"

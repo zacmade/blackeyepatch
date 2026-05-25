@@ -83,7 +83,8 @@ def fetch_products() -> list[dict]:
                 break
 
             # Extract product handles from href links like /en/products/some-handle
-            handles = re.findall(r'href="(/en/products/([^"?#]+))"', html)
+            # Use /en/products/ links only (not /en/collections/.../products/) to avoid duplicates
+            handles = re.findall(r'href="(/en/products/([^"?#/]+))"', html)
             if not handles:
                 break
 

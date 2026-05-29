@@ -24,12 +24,8 @@
   "bepss26cs40",
   "bepss26cs41",
   "bepss26lt13",
-  "bepss26te15-black",
-  "bepss26te17-black",
-  "bepss26te17-white",
-  "bepss26te18-navy",
-  "bepss26te18-white",
-  "bepss26te19",
+  "bepss26te01-black",
+  "bepss26te01-pink",
   "bepss26te20",
   "bepss26te21",
   "bepss26te22",
@@ -46,5 +42,9 @@
   "bepss26te28-apricot",
   "bepss26te28-black",
   "bepss26te28-white",
-  "bepss26te29"
+  "bepss26te29",
+  "bepss26te31-black",
+  "bepss26te31-white",
+  "bepss26te32-black",
+  "bepss26te32-white"
 ]

@@ -26,6 +26,7 @@
   "bepfw26lt08",
   "bepfw26lt10-black",
   "bepfw26lt10-white",
+  "bepfw26lt24",
   "bepfw26te38-navy",
   "bepfw26te38-white",
   "bepfw26te45-black",
@@ -45,6 +46,5 @@
   "bepss26cs40",
   "bepss26cs41",
   "bepss26ei32-black",
-  "bepss26ei32-white",
-  "bepss26ei33-black"
+  "bepss26ei32-white"
 ]
